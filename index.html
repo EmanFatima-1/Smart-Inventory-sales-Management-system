@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Inventory & Sales Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Inventory & Sales System</h1>
+            <nav class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+                <button class="tab-btn" onclick="switchTab('products')">Products</button>
+                <button class="tab-btn" onclick="switchTab('sales')">New Sale</button>
+                <button class="tab-btn" onclick="switchTab('history')">Sales History</button>
+            </nav>
+        </header>
+        <div id="toast" class="toast hidden"></div>
+        <section id="dashboard" class="tab-content active">
+            <h2>Dashboard Overview</h2>
+            <div class="metrics-grid">
+                <div class="card metric-card">
+                    <h3>Total Products</h3>
+                    <p id="metric-total-products">0</p>
+                </div>
+                <div class="card metric-card">
+                    <h3>Total Revenue</h3>
+                    <p id="metric-total-revenue">PKR 0</p>
+                </div>
+                <div class="card metric-card">
+                    <h3>Completed Orders</h3>
+                    <p id="metric-total-orders">0</p>
+                </div>
+                <div class="card metric-card warning">
+                    <h3>Low Stock Alert</h3>
+                    <p id="metric-low-stock">0</p>
+                </div>
+            </div>
+
+            <div class="dashboard-details">
+                <div class="card">
+                    <h3>Top Selling Product</h3>
+                    <p id="metric-top-product">None</p>
+                </div>
+                <div class="card">
+                    <h3>Total Inventory Value (Cost)</h3>
+                    <p id="metric-inventory-cost">PKR 0</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="products" class="tab-content">
+            <h2>Product Management</h2>
+
+            <div class="layout-two-col">
+                <div class="card">
+                    <h3 id="form-title">Add New Product</h3>
+                    <form id="product-form" onsubmit="handleProductSubmit(event)">
+                        <input type="hidden" id="edit-product-id">
+
+                        <div class="form-group">
+                            <label for="prod-id">Product ID</label>
+                            <input type="text" id="prod-id" required placeholder="e.g. PRD-001">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prod-name">Product Name</label>
+                            <input type="text" id="prod-name" required placeholder="e.g. Wireless Mouse">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prod-category">Category</label>
+                            <input type="text" id="prod-category" required placeholder="e.g. Electronics">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="prod-buy-price">Purchase Price (PKR)</label>
+                                <input type="number" id="prod-buy-price" min="0.01" step="0.01" required
+                                    placeholder="1200">
+                            </div>
+                            <div class="form-group">
+                                <label for="prod-sell-price">Selling Price (PKR)</label>
+                                <input type="number" id="prod-sell-price" min="0.01" step="0.01" required
+                                    placeholder="1800">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="prod-qty">Quantity</label>
+                                <input type="number" id="prod-qty" min="0" step="1" required placeholder="25">
+                            </div>
+                            <div class="form-group">
+                                <label for="prod-min-threshold">Min Stock Alert</label>
+                                <input type="number" id="prod-min-threshold" min="0" step="1" required placeholder="5">
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="save-prod-btn">Save Product</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetProductForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Inventory List</h3>
+
+                    <div class="filter-bar">
+                        <input type="text" id="prod-search" placeholder="Search by name or ID..."
+                            oninput="renderProducts()">
+                        <select id="prod-filter-category" onchange="renderProducts()">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="prod-sort-by" onchange="renderProducts()">
+                            <option value="name">Sort by Name</option>
+                            <option value="price">Sort by Price</option>
+                            <option value="qty">Sort by Quantity</option>
+                        </select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Cost</th>
+                                    <th>Price</th>
+                                    <th>Qty</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sales" class="tab-content">
+            <h2>Process New Sale</h2>
+
+            <div class="layout-two-col">
+                <div class="card">
+                    <h3>Select Products</h3>
+                    <div class="filter-bar">
+                        <input type="text" id="sale-prod-search" placeholder="Search available products..."
+                            oninput="renderSaleProducts()">
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sale-products-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Shopping Cart</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                    <th>Qty</th>
+                                    <th>Total</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cart-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="cart-summary">
+                        <div class="summary-line">
+                            <span>Subtotal:</span>
+                            <span id="cart-subtotal">PKR 0.00</span>
+                        </div>
+                        <div class="summary-line text-success">
+                            <span>Discount (10% on Subtotal ≥ PKR 10,000):</span>
+                            <span id="cart-discount">- PKR 0.00</span>
+                        </div>
+                        <div class="summary-line">
+                            <span>Tax (5%):</span>
+                            <span id="cart-tax">PKR 0.00</span>
+                        </div>
+                        <hr>
+                        <div class="summary-line total-line">
+                            <span>Grand Total:</span>
+                            <span id="cart-grand-total">PKR 0.00</span>
+                        </div>
+
+                        <button class="btn btn-success btn-block" onclick="checkout()">Complete Checkout</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="history" class="tab-content">
+            <h2>Sales History</h2>
+            <div class="card">
+                <div class="filter-bar">
+                    <input type="text" id="history-search" placeholder="Search by Sale ID..."
+                        oninput="renderSalesHistory()">
+                    <input type="date" id="history-date-filter" onchange="renderSalesHistory()">
+                    <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Sale ID</th>
+                                <th>Date & Time</th>
+                                <th>Purchased Items</th>
+                                <th>Total Paid</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
