@@ -69,19 +69,28 @@ function loadData() {
     try {
         const savedProducts = localStorage.getItem("app_products");
         const savedSales = localStorage.getItem("app_sales");
+        const savedCart = localStorage.getItem("app_cart");
 
         state.products = savedProducts ? JSON.parse(savedProducts) : getInitialProducts();
         state.sales = savedSales ? JSON.parse(savedSales) : [];
+
+        const rawCart = savedCart ? JSON.parse(savedCart) : [];
+        state.cart = rawCart
+            .filter(item => item && item.id && typeof item.qty === 'number')
+            .filter(item => state.products.some(p => p.id === item.id))
+            .map(item => ({ id: item.id, qty: item.qty }));
     } catch (e) {
         showToast("Error loading saved data. Resetting to default state.");
         state.products = getInitialProducts();
         state.sales = [];
+        state.cart = [];
     }
 }
 
 function saveData() {
     localStorage.setItem("app_products", JSON.stringify(state.products));
     localStorage.setItem("app_sales", JSON.stringify(state.sales));
+    localStorage.setItem("app_cart", JSON.stringify(state.cart.map(({ id, qty }) => ({ id, qty }))));
 }
 
 function getInitialProducts() {
@@ -146,6 +155,8 @@ function handleProductSubmit(e) {
     saveData();
     resetProductForm();
     renderProducts();
+    renderSaleProducts();
+    renderCart();
 }
 
 function resetProductForm() {
@@ -177,9 +188,18 @@ function editProduct(id) {
 function deleteProduct(id) {
     if (confirm(`Are you sure you want to delete product ID: ${id}?`)) {
         state.products = state.products.filter(p => p.id !== id);
+
+        const removedFromCart = state.cart.some(item => item.id === id);
+        state.cart = state.cart.filter(item => item.id !== id);
+        if (removedFromCart) {
+            showToast("Product deleted and removed from cart.");
+        } else {
+            showToast("Product deleted.");
+        }
+
         saveData();
         renderProducts();
-        showToast("Product deleted.");
+        renderCart();
     }
 }
 
@@ -345,21 +365,25 @@ function addToCart(productId) {
             alert(`Cannot add more than available stock (${product.quantity}).`);
         }
     } else {
-        state.cart.push({
-            id: product.id,
-            name: product.name,
-            price: product.sellingPrice,
-            qty: 1
-        });
+        state.cart.push({ id: product.id, qty: 1 });
     }
 
+    saveData();
     renderCart();
 }
 
 function updateCartQty(productId, change) {
     const cartItem = state.cart.find(item => item.id === productId);
     const product = state.products.find(p => p.id === productId);
-    if (!cartItem || !product) return;
+
+    if (!cartItem) return;
+    if (!product) {
+        state.cart = state.cart.filter(item => item.id !== productId);
+        showToast("Item removed: product no longer exists in inventory.");
+        saveData();
+        renderCart();
+        return;
+    }
 
     const newQty = cartItem.qty + change;
 
@@ -371,66 +395,63 @@ function updateCartQty(productId, change) {
         cartItem.qty = newQty;
     }
 
+    saveData();
     renderCart();
 }
 
 function removeFromCart(productId) {
     state.cart = state.cart.filter(item => item.id !== productId);
+    saveData();
     renderCart();
 }
 
 function renderCart() {
-    const tbody = document.getElementById("cart-table-body");
-    tbody.textContent = "";
+    const tbody = document.getElementById('cart-table-body');
+    if (!tbody) return;
+
+    tbody.textContent = '';
+
+    const before = state.cart.length;
+    state.cart = state.cart.filter(item => state.products.some(p => p.id === item.id));
+    if (state.cart.length < before) {
+        showToast('Some cart items were removed because their products were deleted.');
+    }
 
     if (state.cart.length === 0) {
-        tbody.appendChild(emptyRow("Cart is empty.", 5));
+        tbody.appendChild(emptyRow('Cart is empty', 5));
         calculateTotals(0);
         return;
     }
 
-    let subtotal = 0;
     const fragment = document.createDocumentFragment();
 
     state.cart.forEach(item => {
-        const itemTotal = item.price * item.qty;
-        subtotal += itemTotal;
+        const product = state.products.find(p => p.id === item.id);
+        const livePrice = product.sellingPrice;
+        const liveName = product.name;
+        const itemTotal = livePrice * item.qty;
 
-        const tr = document.createElement("tr");
+        const tr = document.createElement('tr');
 
-        tr.appendChild(td(item.name));
-        tr.appendChild(td(`PKR ${item.price.toLocaleString()}`));
+        tr.appendChild(td(liveName));
+        tr.appendChild(td(`PKR ${livePrice.toLocaleString()}`));
 
-        const qtyTd = document.createElement("td");
-
-        const decBtn = document.createElement("button");
-        decBtn.className = "btn btn-sm";
-        decBtn.textContent = "-";
-        decBtn.dataset.id = item.id;
-        decBtn.dataset.action = "dec";
-
-        const qtySpan = document.createElement("span");
-        qtySpan.textContent = ` ${item.qty} `;
-
-        const incBtn = document.createElement("button");
-        incBtn.className = "btn btn-sm";
-        incBtn.textContent = "+";
-        incBtn.dataset.id = item.id;
-        incBtn.dataset.action = "inc";
-
-        qtyTd.appendChild(decBtn);
-        qtyTd.appendChild(qtySpan);
-        qtyTd.appendChild(incBtn);
+        const qtyTd = document.createElement('td');
+        qtyTd.innerHTML = `
+            <button class="btn btn-sm btn-secondary" data-id="${item.id}" data-action="dec">-</button>
+            <span style="margin:0 6px">${item.qty}</span>
+            <button class="btn btn-sm btn-secondary" data-id="${item.id}" data-action="inc">+</button>
+        `;
         tr.appendChild(qtyTd);
 
         tr.appendChild(td(`PKR ${itemTotal.toLocaleString()}`));
 
-        const removeTd = document.createElement("td");
-        const removeBtn = document.createElement("button");
-        removeBtn.className = "btn btn-sm btn-danger";
-        removeBtn.textContent = "×";
+        const removeTd = document.createElement('td');
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn btn-sm btn-danger';
+        removeBtn.textContent = '×';
         removeBtn.dataset.id = item.id;
-        removeBtn.dataset.action = "remove";
+        removeBtn.dataset.action = 'remove';
         removeTd.appendChild(removeBtn);
         tr.appendChild(removeTd);
 
@@ -438,6 +459,14 @@ function renderCart() {
     });
 
     tbody.appendChild(fragment);
+    updateCartTotals();
+}
+
+function updateCartTotals() {
+    const subtotal = state.cart.reduce((sum, item) => {
+        const product = state.products.find(p => p.id === item.id);
+        return sum + (product ? product.sellingPrice * item.qty : 0);
+    }, 0);
     calculateTotals(subtotal);
 }
 
@@ -465,15 +494,23 @@ function checkout() {
         return;
     }
 
-    for (let item of state.cart) {
+    for (const item of state.cart) {
         const product = state.products.find(p => p.id === item.id);
-        if (!product || product.quantity < item.qty) {
-            alert(`Checkout failed: Stock for "${item.name}" changed or is insufficient.`);
+        if (!product) {
+            alert(`Checkout failed: Product "${item.id}" no longer exists in inventory. Please review your cart.`);
+            renderCart();
+            return;
+        }
+        if (product.quantity < item.qty) {
+            alert(`Checkout failed: Insufficient stock for "${product.name}" (available: ${product.quantity}).`);
             return;
         }
     }
 
-    const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const subtotal = state.cart.reduce((sum, item) => {
+        const product = state.products.find(p => p.id === item.id);
+        return sum + (product.sellingPrice * item.qty);
+    }, 0);
     const totals = calculateTotals(subtotal);
 
     state.cart.forEach(item => {
@@ -481,10 +518,20 @@ function checkout() {
         if (product) product.quantity -= item.qty;
     });
 
+    const saleItems = state.cart.map(item => {
+        const product = state.products.find(p => p.id === item.id);
+        return {
+            id: item.id,
+            name: product.name,
+            price: product.sellingPrice,
+            qty: item.qty
+        };
+    });
+
     const newSale = {
         saleId: "SALE-" + Date.now().toString().slice(-6),
         timestamp: new Date().toISOString(),
-        items: [...state.cart],
+        items: saleItems,
         subtotal: totals.subtotal,
         discount: totals.discount,
         tax: totals.tax,
