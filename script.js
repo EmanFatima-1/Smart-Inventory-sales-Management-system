@@ -68,29 +68,41 @@ function switchTab(tabId) {
 function loadData() {
     try {
         const savedProducts = localStorage.getItem("app_products");
-        const savedSales = localStorage.getItem("app_sales");
-        const savedCart = localStorage.getItem("app_cart");
+        const savedSales    = localStorage.getItem("app_sales");
+        const savedCart     = localStorage.getItem("app_cart");
 
-        state.products = savedProducts ? JSON.parse(savedProducts) : getInitialProducts();
-        state.sales = savedSales ? JSON.parse(savedSales) : [];
+        // Parse each key, then guard with Array.isArray so a corrupt/unexpected
+        // JSON type (object, null, string…) never causes .filter is not a function.
+        const parsedProducts = savedProducts ? JSON.parse(savedProducts) : null;
+        state.products = Array.isArray(parsedProducts) ? parsedProducts : getInitialProducts();
 
-        const rawCart = savedCart ? JSON.parse(savedCart) : [];
+        const parsedSales = savedSales ? JSON.parse(savedSales) : null;
+        state.sales = Array.isArray(parsedSales) ? parsedSales : [];
+
+        const parsedCart = savedCart ? JSON.parse(savedCart) : null;
+        const rawCart    = Array.isArray(parsedCart) ? parsedCart : [];
         state.cart = rawCart
-            .filter(item => item && item.id && typeof item.qty === 'number')
+            .filter(item => item && typeof item.id === 'string' && typeof item.qty === 'number')
             .filter(item => state.products.some(p => p.id === item.id))
             .map(item => ({ id: item.id, qty: item.qty }));
     } catch (e) {
         showToast("Error loading saved data. Resetting to default state.");
         state.products = getInitialProducts();
-        state.sales = [];
-        state.cart = [];
+        state.sales    = [];
+        state.cart     = [];
     }
 }
 
 function saveData() {
-    localStorage.setItem("app_products", JSON.stringify(state.products));
-    localStorage.setItem("app_sales", JSON.stringify(state.sales));
-    localStorage.setItem("app_cart", JSON.stringify(state.cart.map(({ id, qty }) => ({ id, qty }))));
+    try {
+        localStorage.setItem("app_products", JSON.stringify(state.products));
+        localStorage.setItem("app_sales",    JSON.stringify(state.sales));
+        localStorage.setItem("app_cart",     JSON.stringify(state.cart.map(({ id, qty }) => ({ id, qty }))));
+    } catch (e) {
+        // Quota exceeded or private-browsing permission error — notify without
+        // touching in-memory state so checkout and cart remain functional.
+        showToast("Warning: Could not save data. Storage may be full or unavailable.");
+    }
 }
 
 function getInitialProducts() {
