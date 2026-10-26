@@ -11,7 +11,46 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSaleProducts();
     renderCart();
     renderSalesHistory();
+
+    document.getElementById("products-table-body").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-id]");
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.dataset.action === "edit") editProduct(id);
+        if (btn.dataset.action === "delete") deleteProduct(id);
+    });
+
+    document.getElementById("sale-products-table-body").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-id]");
+        if (!btn) return;
+        if (btn.dataset.action === "addToCart") addToCart(btn.dataset.id);
+    });
+
+    document.getElementById("cart-table-body").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-id]");
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.dataset.action === "dec") updateCartQty(id, -1);
+        if (btn.dataset.action === "inc") updateCartQty(id, 1);
+        if (btn.dataset.action === "remove") removeFromCart(id);
+    });
 });
+
+function td(text) {
+    const cell = document.createElement("td");
+    cell.textContent = text;
+    return cell;
+}
+
+function emptyRow(message, cols) {
+    const tr = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = cols;
+    cell.style.textAlign = "center";
+    cell.textContent = message;
+    tr.appendChild(cell);
+    return tr;
+}
 
 function switchTab(tabId) {
     document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
@@ -86,7 +125,6 @@ function handleProductSubmit(e) {
         alert("Quantities must be non-negative whole numbers.");
         return;
     }
-
     if (!editId && state.products.some(p => p.id === id)) {
         alert("Product ID already exists. Please use a unique ID.");
         return;
@@ -166,37 +204,62 @@ function renderProducts() {
         return 0;
     });
 
-    tbody.innerHTML = "";
+    tbody.textContent = "";
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No products found.</td></tr>`;
+        tbody.appendChild(emptyRow("No products found.", 8));
         return;
     }
 
-    filtered.forEach(p => {
-        let statusBadge = `<span class="badge badge-success">In Stock</span>`;
-        if (p.quantity === 0) {
-            statusBadge = `<span class="badge badge-danger">Out of Stock</span>`;
-        } else if (p.quantity <= p.minThreshold) {
-            statusBadge = `<span class="badge badge-warning">Low Stock</span>`;
-        }
+    const fragment = document.createDocumentFragment();
 
-        tbody.innerHTML += `
-      <tr>
-        <td>${p.id}</td>
-        <td>${p.name}</td>
-        <td>${p.category}</td>
-        <td>PKR ${p.purchasePrice.toLocaleString()}</td>
-        <td>PKR ${p.sellingPrice.toLocaleString()}</td>
-        <td>${p.quantity}</td>
-        <td>${statusBadge}</td>
-        <td>
-          <button class="btn btn-sm btn-secondary" onclick="editProduct('${p.id}')">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>
-        </td>
-      </tr>
-    `;
+    filtered.forEach(p => {
+        const tr = document.createElement("tr");
+
+        tr.appendChild(td(p.id));
+        tr.appendChild(td(p.name));
+        tr.appendChild(td(p.category));
+        tr.appendChild(td(`PKR ${p.purchasePrice.toLocaleString()}`));
+        tr.appendChild(td(`PKR ${p.sellingPrice.toLocaleString()}`));
+        tr.appendChild(td(p.quantity));
+
+        const statusTd = document.createElement("td");
+        const badge = document.createElement("span");
+        if (p.quantity === 0) {
+            badge.className = "badge badge-danger";
+            badge.textContent = "Out of Stock";
+        } else if (p.quantity <= p.minThreshold) {
+            badge.className = "badge badge-warning";
+            badge.textContent = "Low Stock";
+        } else {
+            badge.className = "badge badge-success";
+            badge.textContent = "In Stock";
+        }
+        statusTd.appendChild(badge);
+        tr.appendChild(statusTd);
+
+        const actionTd = document.createElement("td");
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn btn-sm btn-secondary";
+        editBtn.textContent = "Edit";
+        editBtn.dataset.id = p.id;
+        editBtn.dataset.action = "edit";
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-sm btn-danger";
+        delBtn.textContent = "Delete";
+        delBtn.dataset.id = p.id;
+        delBtn.dataset.action = "delete";
+
+        actionTd.appendChild(editBtn);
+        actionTd.appendChild(delBtn);
+        tr.appendChild(actionTd);
+
+        fragment.appendChild(tr);
     });
+
+    tbody.appendChild(fragment);
 }
 
 function updateCategoryDropdown() {
@@ -204,9 +267,20 @@ function updateCategoryDropdown() {
     const categories = [...new Set(state.products.map(p => p.category))];
     const currentValue = select.value;
 
-    select.innerHTML = `<option value="">All Categories</option>`;
+
+    select.textContent = "";
+
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "All Categories";
+    select.appendChild(defaultOpt);
+
     categories.forEach(cat => {
-        select.innerHTML += `<option value="${cat}" ${cat === currentValue ? "selected" : ""}>${cat}</option>`;
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        if (cat === currentValue) opt.selected = true;
+        select.appendChild(opt);
     });
 }
 
@@ -214,30 +288,48 @@ function renderSaleProducts() {
     const tbody = document.getElementById("sale-products-table-body");
     const searchQuery = document.getElementById("sale-prod-search").value.toLowerCase();
 
-    const filtered = state.products.filter(p => p.name.toLowerCase().includes(searchQuery) || p.id.toLowerCase().includes(searchQuery));
+    const filtered = state.products.filter(
+        p => p.name.toLowerCase().includes(searchQuery) || p.id.toLowerCase().includes(searchQuery)
+    );
 
-    tbody.innerHTML = "";
+    tbody.textContent = "";
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No available products found.</td></tr>`;
+        tbody.appendChild(emptyRow("No available products found.", 4));
         return;
     }
 
+    const fragment = document.createDocumentFragment();
+
     filtered.forEach(p => {
         const isOutOfStock = p.quantity === 0;
-        tbody.innerHTML += `
-      <tr>
-        <td>${p.name} <br><small>${p.id}</small></td>
-        <td>PKR ${p.sellingPrice.toLocaleString()}</td>
-        <td>${p.quantity}</td>
-        <td>
-          <button class="btn btn-sm btn-primary" ${isOutOfStock ? "disabled" : ""} onclick="addToCart('${p.id}')">
-            ${isOutOfStock ? "Out of Stock" : "Add"}
-          </button>
-        </td>
-      </tr>
-    `;
+        const tr = document.createElement("tr");
+
+        const nameTd = document.createElement("td");
+        nameTd.textContent = p.name + " ";
+        const small = document.createElement("small");
+        small.textContent = p.id;
+        nameTd.appendChild(document.createElement("br"));
+        nameTd.appendChild(small);
+        tr.appendChild(nameTd);
+
+        tr.appendChild(td(`PKR ${p.sellingPrice.toLocaleString()}`));
+        tr.appendChild(td(p.quantity));
+
+        const btnTd = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.className = "btn btn-sm btn-primary";
+        btn.textContent = isOutOfStock ? "Out of Stock" : "Add";
+        btn.disabled = isOutOfStock;
+        btn.dataset.id = p.id;
+        btn.dataset.action = "addToCart";
+        btnTd.appendChild(btn);
+        tr.appendChild(btnTd);
+
+        fragment.appendChild(tr);
     });
+
+    tbody.appendChild(fragment);
 }
 
 function addToCart(productId) {
@@ -267,7 +359,6 @@ function addToCart(productId) {
 function updateCartQty(productId, change) {
     const cartItem = state.cart.find(item => item.id === productId);
     const product = state.products.find(p => p.id === productId);
-
     if (!cartItem || !product) return;
 
     const newQty = cartItem.qty + change;
@@ -290,37 +381,63 @@ function removeFromCart(productId) {
 
 function renderCart() {
     const tbody = document.getElementById("cart-table-body");
-    tbody.innerHTML = "";
+    tbody.textContent = "";
 
     if (state.cart.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Cart is empty.</td></tr>`;
+        tbody.appendChild(emptyRow("Cart is empty.", 5));
         calculateTotals(0);
         return;
     }
 
     let subtotal = 0;
+    const fragment = document.createDocumentFragment();
 
     state.cart.forEach(item => {
         const itemTotal = item.price * item.qty;
         subtotal += itemTotal;
 
-        tbody.innerHTML += `
-      <tr>
-        <td>${item.name}</td>
-        <td>PKR ${item.price.toLocaleString()}</td>
-        <td>
-          <button class="btn btn-sm" onclick="updateCartQty('${item.id}', -1)">-</button>
-          ${item.qty}
-          <button class="btn btn-sm" onclick="updateCartQty('${item.id}', 1)">+</button>
-        </td>
-        <td>PKR ${itemTotal.toLocaleString()}</td>
-        <td>
-          <button class="btn btn-sm btn-danger" onclick="removeFromCart('${item.id}')">×</button>
-        </td>
-      </tr>
-    `;
+        const tr = document.createElement("tr");
+
+        tr.appendChild(td(item.name));
+        tr.appendChild(td(`PKR ${item.price.toLocaleString()}`));
+
+        const qtyTd = document.createElement("td");
+
+        const decBtn = document.createElement("button");
+        decBtn.className = "btn btn-sm";
+        decBtn.textContent = "-";
+        decBtn.dataset.id = item.id;
+        decBtn.dataset.action = "dec";
+
+        const qtySpan = document.createElement("span");
+        qtySpan.textContent = ` ${item.qty} `;
+
+        const incBtn = document.createElement("button");
+        incBtn.className = "btn btn-sm";
+        incBtn.textContent = "+";
+        incBtn.dataset.id = item.id;
+        incBtn.dataset.action = "inc";
+
+        qtyTd.appendChild(decBtn);
+        qtyTd.appendChild(qtySpan);
+        qtyTd.appendChild(incBtn);
+        tr.appendChild(qtyTd);
+
+        tr.appendChild(td(`PKR ${itemTotal.toLocaleString()}`));
+
+        const removeTd = document.createElement("td");
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn btn-sm btn-danger";
+        removeBtn.textContent = "×";
+        removeBtn.dataset.id = item.id;
+        removeBtn.dataset.action = "remove";
+        removeTd.appendChild(removeBtn);
+        tr.appendChild(removeTd);
+
+        fragment.appendChild(tr);
     });
 
+    tbody.appendChild(fragment);
     calculateTotals(subtotal);
 }
 
@@ -361,9 +478,7 @@ function checkout() {
 
     state.cart.forEach(item => {
         const product = state.products.find(p => p.id === item.id);
-        if (product) {
-            product.quantity -= item.qty;
-        }
+        if (product) product.quantity -= item.qty;
     });
 
     const newSale = {
@@ -390,7 +505,6 @@ function renderDashboard() {
     const totalRevenue = state.sales.reduce((sum, s) => sum + s.grandTotal, 0);
     const totalOrders = state.sales.length;
     const lowStockCount = state.products.filter(p => p.quantity <= p.minThreshold).length;
-
     const totalCostValue = state.products.reduce((sum, p) => sum + (p.purchasePrice * p.quantity), 0);
 
     const unitsSoldMap = {};
@@ -431,26 +545,34 @@ function renderSalesHistory() {
 
     filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    tbody.innerHTML = "";
+    tbody.textContent = "";
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No sales records found.</td></tr>`;
+        tbody.appendChild(emptyRow("No sales records found.", 4));
         return;
     }
 
-    filtered.forEach(sale => {
-        const formattedDate = new Date(sale.timestamp).toLocaleString();
-        const itemsSummary = sale.items.map(i => `${i.name} (x${i.qty})`).join(", ");
+    const fragment = document.createDocumentFragment();
 
-        tbody.innerHTML += `
-      <tr>
-        <td><strong>${sale.saleId}</strong></td>
-        <td>${formattedDate}</td>
-        <td>${itemsSummary}</td>
-        <td>PKR ${sale.grandTotal.toFixed(2)}</td>
-      </tr>
-    `;
+    filtered.forEach(sale => {
+        const tr = document.createElement("tr");
+
+        const idTd = document.createElement("td");
+        const strong = document.createElement("strong");
+        strong.textContent = sale.saleId;
+        idTd.appendChild(strong);
+        tr.appendChild(idTd);
+
+        tr.appendChild(td(new Date(sale.timestamp).toLocaleString()));
+
+        tr.appendChild(td(sale.items.map(i => `${i.name} (x${i.qty})`).join(", ")));
+
+        tr.appendChild(td(`PKR ${sale.grandTotal.toFixed(2)}`));
+
+        fragment.appendChild(tr);
     });
+
+    tbody.appendChild(fragment);
 }
 
 function clearHistoryFilters() {
