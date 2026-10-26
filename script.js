@@ -597,8 +597,15 @@ function renderSalesHistory() {
 
     let filtered = state.sales.filter(s => {
         const matchesId = s.saleId.toLowerCase().includes(searchQuery);
-        const saleDate = s.timestamp.split("T")[0];
-        const matchesDate = !dateQuery || saleDate === dateQuery;
+
+        // Convert the stored ISO timestamp to a local-timezone date string (YYYY-MM-DD).
+        // Using 'en-CA' locale produces YYYY-MM-DD natively, which is the same format
+        // returned by <input type="date">. This means a sale recorded at e.g. 20:30 UTC
+        // in a UTC+5 timezone correctly resolves to the next calendar day locally,
+        // covering the full 00:00:00–23:59:59 local window for whichever date is picked.
+        const saleLocalDate = new Date(s.timestamp).toLocaleDateString('en-CA');
+        const matchesDate = !dateQuery || saleLocalDate === dateQuery;
+
         return matchesId && matchesDate;
     });
 
