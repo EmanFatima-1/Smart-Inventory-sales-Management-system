@@ -570,19 +570,29 @@ function renderDashboard() {
     const lowStockCount = state.products.filter(p => p.quantity <= p.minThreshold).length;
     const totalCostValue = state.products.reduce((sum, p) => sum + (p.purchasePrice * p.quantity), 0);
 
+
     const unitsSoldMap = {};
     state.sales.forEach(sale => {
         sale.items.forEach(item => {
-            unitsSoldMap[item.name] = (unitsSoldMap[item.name] || 0) + item.qty;
+            const key = item.id || item.name;
+            if (!unitsSoldMap[key]) {
+                unitsSoldMap[key] = {
+                    name: item.name,
+                    qty: 0
+                };
+            }
+            unitsSoldMap[key].qty += item.qty;
+            unitsSoldMap[key].name = item.name;
         });
     });
 
     let topProduct = "None";
     let maxUnits = 0;
-    for (const [name, units] of Object.entries(unitsSoldMap)) {
-        if (units > maxUnits) {
-            maxUnits = units;
-            topProduct = `${name} (${units} units sold)`;
+    for (const id in unitsSoldMap) {
+        const prodData = unitsSoldMap[id];
+        if (prodData.qty > maxUnits) {
+            maxUnits = prodData.qty;
+            topProduct = `${prodData.name} (${prodData.qty} units sold)`;
         }
     }
 
