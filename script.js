@@ -4,19 +4,11 @@ let state = {
     sales: []
 };
 
-/**
- * Generates a collision-resistant Sale ID.
- * Prefers crypto.randomUUID() (RFC 4122 v4, cryptographically random).
- * Falls back to a Date.now() + Math.random() hex string in environments
- * where the Web Crypto API is unavailable (e.g. HTTP in older browsers).
- * @returns {string} e.g. "SALE-3f4a…" or "SALE-FB-19f2c3d4e5f6"
- */
+
 function generateSaleId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        // Trim to first 8 hex chars of UUID for a readable but still unique ID
         return 'SALE-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
     }
-    // Fallback: timestamp + random hex (56-bit entropy, negligible collision risk)
     const hex = (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 12).toUpperCase();
     return 'SALE-FB-' + hex;
 }
@@ -69,12 +61,12 @@ function emptyRow(message, cols) {
     return tr;
 }
 
-function switchTab(tabId) {
+function switchTab(tabId, el) {
     document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
     document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
 
     document.getElementById(tabId).classList.add("active");
-    event.target.classList.add("active");
+    el.classList.add("active");
 
     if (tabId === "dashboard") renderDashboard();
     if (tabId === "products") renderProducts();
@@ -85,11 +77,8 @@ function switchTab(tabId) {
 function loadData() {
     try {
         const savedProducts = localStorage.getItem("app_products");
-        const savedSales    = localStorage.getItem("app_sales");
-        const savedCart     = localStorage.getItem("app_cart");
-
-        // Parse each key, then guard with Array.isArray so a corrupt/unexpected
-        // JSON type (object, null, string…) never causes .filter is not a function.
+        const savedSales = localStorage.getItem("app_sales");
+        const savedCart = localStorage.getItem("app_cart");
         const parsedProducts = savedProducts ? JSON.parse(savedProducts) : null;
         state.products = Array.isArray(parsedProducts) ? parsedProducts : getInitialProducts();
 
@@ -97,7 +86,7 @@ function loadData() {
         state.sales = Array.isArray(parsedSales) ? parsedSales : [];
 
         const parsedCart = savedCart ? JSON.parse(savedCart) : null;
-        const rawCart    = Array.isArray(parsedCart) ? parsedCart : [];
+        const rawCart = Array.isArray(parsedCart) ? parsedCart : [];
         state.cart = rawCart
             .filter(item => item && typeof item.id === 'string' && typeof item.qty === 'number')
             .filter(item => state.products.some(p => p.id === item.id))
@@ -105,19 +94,17 @@ function loadData() {
     } catch (e) {
         showToast("Error loading saved data. Resetting to default state.");
         state.products = getInitialProducts();
-        state.sales    = [];
-        state.cart     = [];
+        state.sales = [];
+        state.cart = [];
     }
 }
 
 function saveData() {
     try {
         localStorage.setItem("app_products", JSON.stringify(state.products));
-        localStorage.setItem("app_sales",    JSON.stringify(state.sales));
-        localStorage.setItem("app_cart",     JSON.stringify(state.cart.map(({ id, qty }) => ({ id, qty }))));
+        localStorage.setItem("app_sales", JSON.stringify(state.sales));
+        localStorage.setItem("app_cart", JSON.stringify(state.cart.map(({ id, qty }) => ({ id, qty }))));
     } catch (e) {
-        // Quota exceeded or private-browsing permission error — notify without
-        // touching in-memory state so checkout and cart remain functional.
         showToast("Warning: Could not save data. Storage may be full or unavailable.");
     }
 }
@@ -614,12 +601,6 @@ function renderSalesHistory() {
 
     let filtered = state.sales.filter(s => {
         const matchesId = s.saleId.toLowerCase().includes(searchQuery);
-
-        // Convert the stored ISO timestamp to a local-timezone date string (YYYY-MM-DD).
-        // Using 'en-CA' locale produces YYYY-MM-DD natively, which is the same format
-        // returned by <input type="date">. This means a sale recorded at e.g. 20:30 UTC
-        // in a UTC+5 timezone correctly resolves to the next calendar day locally,
-        // covering the full 00:00:00–23:59:59 local window for whichever date is picked.
         const saleLocalDate = new Date(s.timestamp).toLocaleDateString('en-CA');
         const matchesDate = !dateQuery || saleLocalDate === dateQuery;
 
