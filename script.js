@@ -487,14 +487,16 @@ function updateCartTotals() {
 }
 
 function calculateTotals(subtotal) {
+    subtotal = Math.round(subtotal * 100) / 100;
+
     let discount = 0;
     if (subtotal >= 10000) {
-        discount = subtotal * 0.10;
+        discount = Math.round((subtotal * 0.10) * 100) / 100;
     }
 
-    const discountedSubtotal = subtotal - discount;
-    const tax = discountedSubtotal * 0.05;
-    const grandTotal = discountedSubtotal + tax;
+    const discountedSubtotal = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+    const tax = Math.round((discountedSubtotal * 0.05) * 100) / 100;
+    const grandTotal = Math.round((discountedSubtotal + tax) * 100) / 100;
 
     document.getElementById("cart-subtotal").innerText = `PKR ${subtotal.toFixed(2)}`;
     document.getElementById("cart-discount").innerText = `- PKR ${discount.toFixed(2)}`;
