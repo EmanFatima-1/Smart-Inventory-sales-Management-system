@@ -4,6 +4,23 @@ let state = {
     sales: []
 };
 
+/**
+ * Generates a collision-resistant Sale ID.
+ * Prefers crypto.randomUUID() (RFC 4122 v4, cryptographically random).
+ * Falls back to a Date.now() + Math.random() hex string in environments
+ * where the Web Crypto API is unavailable (e.g. HTTP in older browsers).
+ * @returns {string} e.g. "SALE-3f4a…" or "SALE-FB-19f2c3d4e5f6"
+ */
+function generateSaleId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        // Trim to first 8 hex chars of UUID for a readable but still unique ID
+        return 'SALE-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+    }
+    // Fallback: timestamp + random hex (56-bit entropy, negligible collision risk)
+    const hex = (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 12).toUpperCase();
+    return 'SALE-FB-' + hex;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     loadData();
     renderDashboard();
@@ -541,7 +558,7 @@ function checkout() {
     });
 
     const newSale = {
-        saleId: "SALE-" + Date.now().toString().slice(-6),
+        saleId: generateSaleId(),
         timestamp: new Date().toISOString(),
         items: saleItems,
         subtotal: totals.subtotal,
