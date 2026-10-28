@@ -571,7 +571,17 @@ function renderDashboard() {
     const totalOrders = state.sales.length;
     const lowStockCount = state.products.filter(p => p.quantity <= p.minThreshold).length;
     const totalCostValue = state.products.reduce((sum, p) => sum + (p.purchasePrice * p.quantity), 0);
+    let totalCOGS = 0;
+    state.sales.forEach(sale => {
+        sale.items.forEach(item => {
+            const product = state.products.find(p => p.id === item.id);
+            const purchasePrice = product ? product.purchasePrice : (item.purchasePrice || 0);
+            totalCOGS += purchasePrice * item.qty;
+        });
+    });
 
+    const totalProfit = Math.round((totalRevenue - totalCOGS) * 100) / 100;
+    const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : "0.0";
 
     const unitsSoldMap = {};
     state.sales.forEach(sale => {
@@ -604,8 +614,12 @@ function renderDashboard() {
     document.getElementById("metric-low-stock").innerText = lowStockCount;
     document.getElementById("metric-top-product").innerText = topProduct;
     document.getElementById("metric-inventory-cost").innerText = `PKR ${totalCostValue.toLocaleString()}`;
-}
 
+    const profitElem = document.getElementById("metric-total-profit");
+    if (profitElem) {
+        profitElem.innerText = `PKR ${totalProfit.toFixed(2)} (${profitMargin}%)`;
+    }
+}
 function renderSalesHistory() {
     const tbody = document.getElementById("history-table-body");
     const searchQuery = document.getElementById("history-search").value.toLowerCase();
