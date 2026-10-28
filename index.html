@@ -50,6 +50,10 @@
                     <h3>Total Inventory Value (Cost)</h3>
                     <p id="metric-inventory-cost">PKR 0</p>
                 </div>
+                <div class="card">
+                    <h3>Total Profit (Margin)</h3>
+                    <p id="metric-total-profit">PKR 0.00 (0.0%)</p>
+                </div>
             </div>
         </section>
 
@@ -64,17 +68,18 @@
 
                         <div class="form-group">
                             <label for="prod-id">Product ID</label>
-                            <input type="text" id="prod-id" required placeholder="e.g. PRD-001">
+                            <input type="text" id="prod-id" maxlength="20" required placeholder="e.g. PRD-001">
                         </div>
 
                         <div class="form-group">
                             <label for="prod-name">Product Name</label>
-                            <input type="text" id="prod-name" required placeholder="e.g. Wireless Mouse">
+                            <input type="text" id="prod-name" maxlength="50" required placeholder="e.g. Wireless Mouse">
                         </div>
 
                         <div class="form-group">
                             <label for="prod-category">Category</label>
-                            <input type="text" id="prod-category" required placeholder="e.g. Electronics">
+                            <input type="text" id="prod-category" maxlength="30" required
+                                placeholder="e.g. Electronics">
                         </div>
 
                         <div class="form-row">
@@ -112,7 +117,7 @@
                     <h3>Inventory List</h3>
 
                     <div class="filter-bar">
-                        <input type="text" id="prod-search" placeholder="Search by name or ID..."
+                        <input type="text" id="prod-search" maxlength="50" placeholder="Search by name or ID..."
                             oninput="renderProducts()">
                         <select id="prod-filter-category" onchange="renderProducts()">
                             <option value="">All Categories</option>
@@ -152,8 +157,8 @@
                 <div class="card">
                     <h3>Select Products</h3>
                     <div class="filter-bar">
-                        <input type="text" id="sale-prod-search" placeholder="Search available products..."
-                            oninput="renderSaleProducts()">
+                        <input type="text" id="sale-prod-search" maxlength="50"
+                            placeholder="Search available products..." oninput="renderSaleProducts()">
                     </div>
                     <div class="table-responsive">
                         <table>
@@ -215,7 +220,7 @@
             <h2>Sales History</h2>
             <div class="card">
                 <div class="filter-bar">
-                    <input type="text" id="history-search" placeholder="Search by Sale ID..."
+                    <input type="text" id="history-search" maxlength="30" placeholder="Search by Sale ID..."
                         oninput="renderSalesHistory()">
                     <input type="date" id="history-date-filter" onchange="renderSalesHistory()">
                     <button class="btn btn-secondary" onclick="clearHistoryFilters()">Clear Filters</button>
