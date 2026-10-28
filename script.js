@@ -4,7 +4,6 @@ let state = {
     sales: []
 };
 
-
 function generateSaleId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return 'SALE-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
@@ -62,11 +61,11 @@ function emptyRow(message, cols) {
 }
 
 function switchTab(tabId, el) {
-    document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-    document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(item => item.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(item => item.classList.remove("active"));
 
     document.getElementById(tabId).classList.add("active");
-    el.classList.add("active");
+    if (el) el.classList.add("active");
 
     if (tabId === "dashboard") renderDashboard();
     if (tabId === "products") renderProducts();
@@ -125,6 +124,7 @@ function getInitialProducts() {
 
 function showToast(message) {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.innerText = message;
     toast.classList.remove("hidden");
     setTimeout(() => toast.classList.add("hidden"), 3000);
@@ -136,22 +136,32 @@ function handleProductSubmit(e) {
     const editId = document.getElementById("edit-product-id").value;
     const id = document.getElementById("prod-id").value.trim();
     const name = document.getElementById("prod-name").value.trim();
-    const category = document.getElementById("prod-category").value.trim();
+
+    const rawCategory = document.getElementById("prod-category").value.trim();
+    const category = rawCategory ? rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1).toLowerCase() : '';
+
     const purchasePrice = parseFloat(document.getElementById("prod-buy-price").value);
     const sellingPrice = parseFloat(document.getElementById("prod-sell-price").value);
     const quantity = parseInt(document.getElementById("prod-qty").value, 10);
     const minThreshold = parseInt(document.getElementById("prod-min-threshold").value, 10);
 
     if (purchasePrice <= 0 || sellingPrice <= 0) {
-        alert("Prices must be positive values.");
+        showToast("Prices must be positive values.");
         return;
     }
+
+    if (purchasePrice > sellingPrice) {
+        if (!confirm("Warning: Purchase price is higher than selling price (selling at a loss). Do you want to continue?")) {
+            return;
+        }
+    }
+
     if (quantity < 0 || minThreshold < 0) {
-        alert("Quantities must be non-negative whole numbers.");
+        showToast("Quantities must be non-negative whole numbers.");
         return;
     }
     if (!editId && state.products.some(p => p.id === id)) {
-        alert("Product ID already exists. Please use a unique ID.");
+        showToast("Product ID already exists. Please use a unique ID.");
         return;
     }
 
@@ -229,7 +239,7 @@ function renderProducts() {
 
     let filtered = state.products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchQuery) || p.id.toLowerCase().includes(searchQuery);
-        const matchesCategory = categoryFilter === "" || p.category === categoryFilter;
+        const matchesCategory = categoryFilter === "" || p.category.toLowerCase() === categoryFilter.toLowerCase();
         return matchesSearch && matchesCategory;
     });
 
@@ -300,9 +310,20 @@ function renderProducts() {
 
 function updateCategoryDropdown() {
     const select = document.getElementById("prod-filter-category");
-    const categories = [...new Set(state.products.map(p => p.category))];
-    const currentValue = select.value;
+    if (!select) return;
 
+    const categoryMap = {};
+    state.products.forEach(p => {
+        if (p.category) {
+            const lower = p.category.toLowerCase();
+            if (!categoryMap[lower]) {
+                categoryMap[lower] = p.category;
+            }
+        }
+    });
+
+    const categories = Object.values(categoryMap);
+    const currentValue = select.value;
 
     select.textContent = "";
 
@@ -315,7 +336,7 @@ function updateCategoryDropdown() {
         const opt = document.createElement("option");
         opt.value = cat;
         opt.textContent = cat;
-        if (cat === currentValue) opt.selected = true;
+        if (cat.toLowerCase() === currentValue.toLowerCase()) opt.selected = true;
         select.appendChild(opt);
     });
 }
@@ -378,7 +399,7 @@ function addToCart(productId) {
         if (cartItem.qty < product.quantity) {
             cartItem.qty++;
         } else {
-            alert(`Cannot add more than available stock (${product.quantity}).`);
+            showToast(`Cannot add more than available stock (${product.quantity}).`);
         }
     } else {
         state.cart.push({ id: product.id, qty: 1 });
@@ -406,7 +427,7 @@ function updateCartQty(productId, change) {
     if (newQty <= 0) {
         state.cart = state.cart.filter(item => item.id !== productId);
     } else if (newQty > product.quantity) {
-        alert(`Cannot exceed available stock level (${product.quantity}).`);
+        showToast(`Cannot exceed available stock level (${product.quantity}).`);
     } else {
         cartItem.qty = newQty;
     }
@@ -508,19 +529,19 @@ function calculateTotals(subtotal) {
 
 function checkout() {
     if (state.cart.length === 0) {
-        alert("Cannot process an empty checkout.");
+        showToast("Cannot process an empty checkout.");
         return;
     }
 
     for (const item of state.cart) {
         const product = state.products.find(p => p.id === item.id);
         if (!product) {
-            alert(`Checkout failed: Product "${item.id}" no longer exists in inventory. Please review your cart.`);
+            showToast(`Checkout failed: Product "${item.id}" no longer exists in inventory.`);
             renderCart();
             return;
         }
         if (product.quantity < item.qty) {
-            alert(`Checkout failed: Insufficient stock for "${product.name}" (available: ${product.quantity}).`);
+            showToast(`Checkout failed: Insufficient stock for "${product.name}".`);
             return;
         }
     }
@@ -536,12 +557,14 @@ function checkout() {
         if (product) product.quantity -= item.qty;
     });
 
+
     const saleItems = state.cart.map(item => {
         const product = state.products.find(p => p.id === item.id);
         return {
             id: item.id,
             name: product.name,
             price: product.sellingPrice,
+            purchasePrice: product.purchasePrice || 0,
             qty: item.qty
         };
     });
@@ -571,11 +594,12 @@ function renderDashboard() {
     const totalOrders = state.sales.length;
     const lowStockCount = state.products.filter(p => p.quantity <= p.minThreshold).length;
     const totalCostValue = state.products.reduce((sum, p) => sum + (p.purchasePrice * p.quantity), 0);
+
     let totalCOGS = 0;
     state.sales.forEach(sale => {
         sale.items.forEach(item => {
             const product = state.products.find(p => p.id === item.id);
-            const purchasePrice = product ? product.purchasePrice : (item.purchasePrice || 0);
+            const purchasePrice = item.purchasePrice !== undefined ? item.purchasePrice : (product ? product.purchasePrice : 0);
             totalCOGS += purchasePrice * item.qty;
         });
     });
@@ -620,6 +644,7 @@ function renderDashboard() {
         profitElem.innerText = `PKR ${totalProfit.toFixed(2)} (${profitMargin}%)`;
     }
 }
+
 function renderSalesHistory() {
     const tbody = document.getElementById("history-table-body");
     const searchQuery = document.getElementById("history-search").value.toLowerCase();
